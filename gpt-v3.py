@@ -10,6 +10,7 @@ learning_rate=1e-3
 device='cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters=200
 n_embd=32
+dropout=0.1
 print(device)
 with open('input.txt',"r", encoding="utf-8") as f:
     text=f.read()
@@ -46,6 +47,7 @@ class Head(nn.Module):
         self.key=nn.Linear(n_embd,head_size,bias=False)
         self.value=nn.Linear(n_embd,head_size,bias=False)
         self.query=nn.Linear(n_embd,head_size,bias=False)
+        self.dropout= nn.Dropout(dropout)
 
     def forward(self,idx):
         B,T,C=idx.shape
@@ -56,6 +58,7 @@ class Head(nn.Module):
         s=torch.tril(torch.ones(T,T))
         wei=wei.masked_fill(s==0,float('-inf'))
         wei=F.softmax(wei,dim=-1)
+        wei=self.dropout(wei)
         op=wei@v
         return op
 
@@ -66,10 +69,12 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.heads=nn.ModuleList([Head(head_size) for _ in range(num_heads)])
         self.projs=nn.Linear(n_embd,n_embd)
+        self.dropout= nn.Dropout(dropout)
 
     def forward(self,idx):
         op=torch.cat([h(idx) for h in self.heads],dim=-1)
         op=self.projs(op)
+        op=self.dropout(op)
         return op
 
 class FeedForwardNN(nn.Module):
@@ -77,7 +82,8 @@ class FeedForwardNN(nn.Module):
         super().__init__()
         self.net =nn.Sequential(nn.Linear(n_embd,4*n_embd),
                              nn.ReLU(),
-                             nn.Linear(4*n_embd,n_embd)
+                             nn.Linear(4*n_embd,n_embd),
+                             nn.Dropout(dropout)
                              )
     
 
