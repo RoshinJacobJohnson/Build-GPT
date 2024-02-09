@@ -6,7 +6,7 @@ batch_size=32
 block_size=8
 max_iters=5000
 eval_interval=300
-learning_rate=1e-2
+learning_rate=1e-3
 device='cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters=200
 n_embd=32
@@ -48,7 +48,7 @@ class Head(nn.Module):
         self.query=nn.Linear(n_embd,head_size,bias=False)
 
     def forward(self,idx):
-        B,T,C=x.shape
+        B,T,C=idx.shape
         k=self.key(idx)
         v=self.value(idx)
         q=self.query(idx)
@@ -60,12 +60,23 @@ class Head(nn.Module):
         return op
 
 
+class MultiHeadAttention(nn.Module):
+
+    def __init__(self,head_size,num_heads):
+        super().__init__()
+        self.heads=nn.ModuleList([Head(head_size) for _ in num_heads])
+
+    def forward(self,idx):
+        op=torch.cat([h(x) for h in self.heads],dim=-1)
+        return op
+
 
 class Bigram(nn.Module):
     def __init__(self,vocab_size):
         super().__init__()
         self.token_embedding_table=nn.Embedding(vocab_size,n_embd)
         self.poition_embedding_table=nn.Embedding(block_size,n_embd)
+        self.sa_heads=MultiHeadAttention(4,n_embd//4)
         self.lm_head=nn.Linear(n_embd,vocab_size)
 
         
@@ -74,6 +85,7 @@ class Bigram(nn.Module):
         token_embd=self.token_embedding_table(idx) #B,T,C
         pos_embd= self.poition_embedding_table(torch.arange(T, device=device))
         x=(token_embd+pos_embd)
+        x=self.sa_heads(x)
         logits=self.lm_head(x)
         if targets is None:
             loss=None
@@ -88,7 +100,7 @@ class Bigram(nn.Module):
     def generate(self,idx,new_token_len):
         
         for i in range(new_token_len):
-            pred,loss=self(idx[:,:block_size])
+            pred,loss=self(idx[:,-block_size:])
             op=pred[:,-1,:]
             prob=F.softmax(op,dim=-1)
             idx_n=torch.multinomial(prob,num_samples=1)
