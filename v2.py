@@ -70,6 +70,17 @@ class MultiHeadAttention(nn.Module):
         op=torch.cat([h(idx) for h in self.heads],dim=-1)
         return op
 
+class FeedForwardNN(nn.Module):
+    def __init__(self,n_embd):
+        super().__init__()
+        self.net =nn.Sequential(nn.Linear(n_embd,n_embd),
+                             nn.ReLU())
+
+    def forward(self,idx):
+        return self.net(idx)
+
+
+
 
 class Bigram(nn.Module):
     def __init__(self,vocab_size):
@@ -77,6 +88,7 @@ class Bigram(nn.Module):
         self.token_embedding_table=nn.Embedding(vocab_size,n_embd)
         self.poition_embedding_table=nn.Embedding(block_size,n_embd)
         self.sa_heads=MultiHeadAttention(4,n_embd//4)
+        self.ffwd=FeedForwardNN(n_embd)
         self.lm_head=nn.Linear(n_embd,vocab_size)
 
         
@@ -86,6 +98,7 @@ class Bigram(nn.Module):
         pos_embd= self.poition_embedding_table(torch.arange(T, device=device))
         x=(token_embd+pos_embd)
         x=self.sa_heads(x)
+        x=self.ffwd(x)
         logits=self.lm_head(x)
         if targets is None:
             loss=None
@@ -106,7 +119,9 @@ class Bigram(nn.Module):
             idx_n=torch.multinomial(prob,num_samples=1)
             idx=torch.cat([idx,idx_n],dim=1)
         return idx
-    
+
+
+
 
 @torch.no_grad()
 def estimate_loss():
