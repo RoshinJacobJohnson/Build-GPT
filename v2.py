@@ -64,10 +64,10 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(self,head_size,num_heads):
         super().__init__()
-        self.heads=nn.ModuleList([Head(head_size) for _ in num_heads])
+        self.heads=nn.ModuleList([Head(head_size) for _ in range(num_heads)])
 
     def forward(self,idx):
-        op=torch.cat([h(x) for h in self.heads],dim=-1)
+        op=torch.cat([h(idx) for h in self.heads],dim=-1)
         return op
 
 
